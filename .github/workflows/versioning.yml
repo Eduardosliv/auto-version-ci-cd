@@ -1,33 +1,3 @@
-name: Versioning Automation
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  auto-version:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar usuário do Git
-        run: |
-          git config user.name "CI Bot"
-          git config user.email "ci-bot@example.com"
-
-      - name: Ler versão atual e incrementar
-        id: version
-        run: |
-          CURRENT_VERSION=$(cat version.txt)
-          VERSION_NUMBER=${CURRENT_VERSION#v}
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUMBER"
-          PATCH=$((PATCH + 1))
-          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          echo "$NEW_VERSION" > version.txt
-          echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
 name: Auto Versioning
 
 on:
@@ -40,55 +10,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Clona o código do repositório
+      # 1️⃣ Checkout do código
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      # 2️⃣ Configura o usuário do Git para o commit automático
+      # 2️⃣ Configura o Git para o commit automático
       - name: Set up Git
         run: |
           git config user.name "CI Bot"
           git config user.email "ci-bot@github.com"
 
-      # 3️⃣ Lê, incrementa e atualiza a versão
+      # 3️⃣ Incrementa a versão
       - name: Increment version number
+        id: bump
         run: |
           VERSION_FILE="version.txt"
           CURRENT_VERSION=$(cat $VERSION_FILE)
           echo "Versão atual: $CURRENT_VERSION"
 
-          # Remove o 'v' e divide em partes
           VERSION_NUM=${CURRENT_VERSION#v}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUM"
-
-          # Incrementa o último número
           PATCH=$((PATCH + 1))
-
-          # Monta a nova versão
           NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+
+          echo "$NEW_VERSION" > $VERSION_FILE
           echo "Nova versão: $NEW_VERSION"
 
-          # Atualiza o arquivo
-          echo "$NEW_VERSION" > $VERSION_FILE
+          # Exporta a nova versão como saída
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      # 4️⃣ Commit do novo arquivo version.txt
+      # 4️⃣ Faz commit do novo arquivo version.txt
       - name: Commit updated version
         run: |
           git add version.txt
-          git commit -m "chore: atualiza versão para $NEW_VERSION" || echo "Nenhuma alteração a commitar"
+          git commit -m "chore: atualiza versão para ${{ steps.bump.outputs.new_version }}" || echo "Nenhuma alteração a commitar"
 
-      # 5️⃣ Faz o push para a branch main
+      # 5️⃣ Envia as mudanças de volta à branch main
       - name: Push changes
         uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
-
-      - name: Fazer commit e push
-        run: |
-          git add version.txt
-          git commit -m "chore: atualiza versão para ${{ env.new_version }}" || echo "Nada a commitar"
-          git push origin main
 
